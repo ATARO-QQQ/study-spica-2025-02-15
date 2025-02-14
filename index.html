@@ -3,202 +3,83 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>天体の公転シミュレーション</title>
+    <title>WebGL 天体公転シミュレーション</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
-        body {
-            margin: 0;
-            overflow: auto;
-            background-color: #000;
-            color: white;
-            font-family: Arial, sans-serif;
-        }
-        canvas {
-            display: block;
-        }
-        .controls {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            z-index: 10;
-            color: white;
-            max-height: 80%;
-            overflow-y: auto;
-        }
-        .controls input, .controls button {
-            margin: 5px;
-        }
-        .controls button {
-            margin-top: 10px;
-        }
-        .planet-form {
-            margin-bottom: 20px;
-        }
+        body { margin: 0; overflow: hidden; background: black; }
+        #gui-container { position: absolute; top: 10px; left: 10px; color: white; }
     </style>
 </head>
 <body>
-    <div class="controls">
-        <h3>天体の設定</h3>
-        <div id="planet-forms"></div>
-        <button onclick="startSimulation()">シミュレーション開始</button>
+    <div id="gui-container">
+        <label for="planet-count">天体数:</label>
+        <input type="number" id="planet-count" min="1" max="10" value="5">
+        <button onclick="updatePlanets()">更新</button>
     </div>
-    <canvas id="canvas"></canvas>
-
     <script>
-        const canvas = document.getElementById('canvas');
-        const gl = canvas.getContext('webgl');
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
+        let scene, camera, renderer;
+        let star, planets = [];
+        let planetCount = 5;
 
-        let planets = [];
-        let numPlanets = 0;
-        const maxPlanets = 10;
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
 
-        // WebGLシェーダプログラムの作成
-        function createShader(type, source) {
-            const shader = gl.createShader(type);
-            gl.shaderSource(shader, source);
-            gl.compileShader(shader);
-            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-                alert('シェーダコンパイルエラー: ' + gl.getShaderInfoLog(shader));
-                return null;
-            }
-            return shader;
-        }
+            // 恒星（中心の星）
+            const starGeometry = new THREE.SphereGeometry(1, 32, 32);
+            const starMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+            star = new THREE.Mesh(starGeometry, starMaterial);
+            scene.add(star);
 
-        const vertexShaderSource = `
-            attribute vec2 a_position;
-            uniform mat4 u_projection;
-            void main() {
-                gl_Position = u_projection * vec4(a_position, 0.0, 1.0);
-            }
-        `;
-        const fragmentShaderSource = `
-            precision mediump float;
-            uniform vec4 u_color;
-            void main() {
-                gl_FragColor = u_color;
-            }
-        `;
-        const vertexShader = createShader(gl.VERTEX_SHADER, vertexShaderSource);
-        const fragmentShader = createShader(gl.FRAGMENT_SHADER, fragmentShaderSource);
-
-        const program = gl.createProgram();
-        gl.attachShader(program, vertexShader);
-        gl.attachShader(program, fragmentShader);
-        gl.linkProgram(program);
-        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-            alert('プログラムリンクエラー: ' + gl.getProgramInfoLog(program));
-        }
-
-        const a_position = gl.getAttribLocation(program, 'a_position');
-        const u_projection = gl.getUniformLocation(program, 'u_projection');
-        const u_color = gl.getUniformLocation(program, 'u_color');
-
-        gl.useProgram(program);
-
-        // 天体データの設定
-        function setPlanetData(radius, speed, color) {
-            const numSegments = 100;
-            const vertices = [];
-            for (let i = 0; i < numSegments; i++) {
-                const angle = (i / numSegments) * 2 * Math.PI;
-                vertices.push(radius * Math.cos(angle), radius * Math.sin(angle));
-            }
-            const vertexBuffer = gl.createBuffer();
-            gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
-            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
-
-            const planet = {
-                radius,
-                speed,
-                color,
-                buffer: vertexBuffer,
-                angle: 0,
-                orbitSpeed: speed,
-            };
-            planets.push(planet);
-            numPlanets++;
-        }
-
-        // プロジェクション行列の設定
-        function setProjectionMatrix() {
-            const aspect = canvas.width / canvas.height;
-            const projectionMatrix = [
-                2 / canvas.width, 0, 0, 0,
-                0, 2 / canvas.height, 0, 0,
-                0, 0, -1, 0,
-                -1, -1, 0, 1
-            ];
-            gl.uniformMatrix4fv(u_projection, false, new Float32Array(projectionMatrix));
-        }
-
-        // 天体を描画
-        function drawPlanet(planet) {
-            gl.bindBuffer(gl.ARRAY_BUFFER, planet.buffer);
-            gl.vertexAttribPointer(a_position, 2, gl.FLOAT, false, 0, 0);
-            gl.enableVertexAttribArray(a_position);
-            gl.uniform4fv(u_color, planet.color);
-            gl.drawArrays(gl.LINE_LOOP, 0, 100);
-        }
-
-        // アニメーション更新
-        function animate() {
-            gl.clear(gl.COLOR_BUFFER_BIT);
-            setProjectionMatrix();
-
-            for (let i = 0; i < planets.length; i++) {
-                const planet = planets[i];
-                planet.angle += planet.orbitSpeed;
-                const x = planet.radius * Math.cos(planet.angle);
-                const y = planet.radius * Math.sin(planet.angle);
-                gl.uniform4fv(u_color, planet.color);
-                drawPlanet(planet);
-            }
-
-            requestAnimationFrame(animate);
-        }
-
-        // シミュレーション開始
-        function startSimulation() {
-            // 既存の天体データをクリア
-            planets = [];
-
-            const forms = document.querySelectorAll('.planet-form');
-            forms.forEach((form, index) => {
-                const radius = parseFloat(form.querySelector('.radius').value);
-                const speed = parseFloat(form.querySelector('.speed').value);
-                const color = [
-                    parseFloat(form.querySelector('.color-red').value),
-                    parseFloat(form.querySelector('.color-green').value),
-                    parseFloat(form.querySelector('.color-blue').value),
-                    1.0,
-                ];
-                setPlanetData(radius, speed, color);
-            });
+            camera.position.z = 10;
+            createPlanets();
             animate();
         }
 
-        // コントロール用のフォームを作成
-        function createPlanetControls() {
-            const container = document.getElementById('planet-forms');
-            container.innerHTML = '';
-            for (let i = 0; i < maxPlanets; i++) {
-                const form = document.createElement('div');
-                form.classList.add('planet-form');
-                form.innerHTML = `
-                    <h4>天体 ${i + 1}</h4>
-                    <label>公転半径: <input class="radius" type="number" step="0.1" min="1" value="${i + 1}"></label><br>
-                    <label>公転速度: <input class="speed" type="number" step="0.1" min="0" value="${0.01 * (i + 1)}"></label><br>
-                    <label>色: R <input class="color-red" type="number" value="1.0" min="0" max="1" step="0.01">
-                          G <input class="color-green" type="number" value="0.0" min="0" max="1" step="0.01">
-                          B <input class="color-blue" type="number" value="0.0" min="0" max="1" step="0.01"></label><br>
-                `;
-                container.appendChild(form);
+        function createPlanets() {
+            // 既存の天体を削除
+            planets.forEach(planet => scene.remove(planet.mesh));
+            planets = [];
+            
+            for (let i = 0; i < planetCount; i++) {
+                let distance = 2 + i * 1.5;
+                let speed = 0.01 + i * 0.002;
+                let size = 0.3 + Math.random() * 0.2;
+                
+                const planetGeometry = new THREE.SphereGeometry(size, 16, 16);
+                const planetMaterial = new THREE.MeshBasicMaterial({ color: Math.random() * 0xffffff });
+                let planetMesh = new THREE.Mesh(planetGeometry, planetMaterial);
+                scene.add(planetMesh);
+                
+                planets.push({ mesh: planetMesh, distance, speed, angle: Math.random() * Math.PI * 2 });
             }
         }
 
-        // 初期化
-        createPlanetControls();
+        function animate() {
+            requestAnimationFrame(animate);
+            planets.forEach(planet => {
+                planet.angle += planet.speed;
+                planet.mesh.position.x = Math.cos(planet.angle) * planet.distance;
+                planet.mesh.position.z = Math.sin(planet.angle) * planet.distance;
+            });
+            renderer.render(scene, camera);
+        }
+
+        function updatePlanets() {
+            planetCount = parseInt(document.getElementById("planet-count").value);
+            createPlanets();
+        }
+
+        window.addEventListener("resize", () => {
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+        });
+
+        init();
     </script>
 </body>
 </html>
