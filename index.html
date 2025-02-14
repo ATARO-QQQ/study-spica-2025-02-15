@@ -21,6 +21,7 @@
         let scene, camera, renderer;
         let star, planets = [];
         let planetCount = 5;
+        let planetData = [];
 
         function init() {
             scene = new THREE.Scene();
@@ -35,9 +36,22 @@
             scene.add(star);
 
             camera.position.z = 10;
+            initializePlanetData();
             createSettings();
             createPlanets();
             animate();
+        }
+
+        function initializePlanetData() {
+            planetData = [];
+            for (let i = 0; i < planetCount; i++) {
+                planetData.push({
+                    size: 0.5,
+                    color: "#ffffff",
+                    distance: 2 + i * 1.5,
+                    speed: 0.01 + i * 0.002
+                });
+            }
         }
 
         function createSettings() {
@@ -47,13 +61,13 @@
                 let div = document.createElement("div");
                 div.innerHTML = `
                     <label>天体 ${i + 1} 大きさ:</label>
-                    <input type="number" id="size-${i}" value="0.5" step="0.1">
+                    <input type="number" id="size-${i}" value="${planetData[i].size}" step="0.1">
                     <label>色:</label>
-                    <input type="color" id="color-${i}" value="#ffffff">
+                    <input type="color" id="color-${i}" value="${planetData[i].color}">
                     <label>公転半径:</label>
-                    <input type="number" id="radius-${i}" value="${2 + i * 1.5}" step="0.1">
+                    <input type="number" id="radius-${i}" value="${planetData[i].distance}" step="0.1">
                     <label>速度:</label>
-                    <input type="number" id="speed-${i}" value="${0.01 + i * 0.002}" step="0.001">
+                    <input type="number" id="speed-${i}" value="${planetData[i].speed}" step="0.001">
                     <br>
                 `;
                 container.appendChild(div);
@@ -65,17 +79,17 @@
             planets = [];
             
             for (let i = 0; i < planetCount; i++) {
-                let size = parseFloat(document.getElementById(`size-${i}`).value);
-                let color = document.getElementById(`color-${i}`).value;
-                let distance = parseFloat(document.getElementById(`radius-${i}`).value);
-                let speed = parseFloat(document.getElementById(`speed-${i}`).value);
+                planetData[i].size = parseFloat(document.getElementById(`size-${i}`).value);
+                planetData[i].color = document.getElementById(`color-${i}`).value;
+                planetData[i].distance = parseFloat(document.getElementById(`radius-${i}`).value);
+                planetData[i].speed = parseFloat(document.getElementById(`speed-${i}`).value);
                 
-                const planetGeometry = new THREE.SphereGeometry(size, 16, 16);
-                const planetMaterial = new THREE.MeshBasicMaterial({ color });
+                const planetGeometry = new THREE.SphereGeometry(planetData[i].size, 16, 16);
+                const planetMaterial = new THREE.MeshBasicMaterial({ color: planetData[i].color });
                 let planetMesh = new THREE.Mesh(planetGeometry, planetMaterial);
                 scene.add(planetMesh);
                 
-                planets.push({ mesh: planetMesh, distance, speed, angle: Math.random() * Math.PI * 2 });
+                planets.push({ mesh: planetMesh, distance: planetData[i].distance, speed: planetData[i].speed, angle: Math.random() * Math.PI * 2 });
             }
         }
 
@@ -91,6 +105,18 @@
 
         function updatePlanets() {
             planetCount = parseInt(document.getElementById("planet-count").value);
+            if (planetData.length < planetCount) {
+                for (let i = planetData.length; i < planetCount; i++) {
+                    planetData.push({
+                        size: 0.5,
+                        color: "#ffffff",
+                        distance: 2 + i * 1.5,
+                        speed: 0.01 + i * 0.002
+                    });
+                }
+            } else {
+                planetData = planetData.slice(0, planetCount);
+            }
             createSettings();
             createPlanets();
         }
