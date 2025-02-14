@@ -152,7 +152,6 @@
                 const x = planet.radius * Math.cos(planet.angle);
                 const y = planet.radius * Math.sin(planet.angle);
                 gl.uniform4fv(u_color, planet.color);
-                gl.drawArrays(gl.LINE_LOOP, 0, 100);
                 drawPlanet(planet);
             }
 
@@ -161,6 +160,9 @@
 
         // シミュレーション開始
         function startSimulation() {
+            // 既存の天体データをクリア
+            planets = [];
+
             const forms = document.querySelectorAll('.planet-form');
             forms.forEach((form, index) => {
                 const radius = parseFloat(form.querySelector('.radius').value);
