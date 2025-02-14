@@ -7,7 +7,7 @@
     <style>
         body { margin: 0; overflow: hidden; display: flex; }
         #controls { width: 300px; padding: 10px; background: #ccc; }
-        canvas { flex-grow: 1; }
+        canvas { flex-grow: 1; display: block; }
     </style>
 </head>
 <body>
@@ -25,8 +25,14 @@
             alert("WebGLがサポートされていません。");
         }
         
-        canvas.width = window.innerWidth - 300;
-        canvas.height = window.innerHeight;
+        function resizeCanvas() {
+            canvas.width = window.innerWidth - 300;
+            canvas.height = window.innerHeight;
+            gl.viewport(0, 0, canvas.width, canvas.height);
+        }
+        
+        window.addEventListener("resize", resizeCanvas);
+        resizeCanvas();
         
         let planets = [];
         function createPlanetSettings() {
@@ -68,10 +74,11 @@
         function render() {
             gl.clearColor(0, 0, 0, 1);
             gl.clear(gl.COLOR_BUFFER_BIT);
+            let aspectRatio = canvas.width / canvas.height;
             planets.forEach(planet => {
                 planet.angle += planet.speed;
-                let x = Math.cos(planet.angle) * planet.radius / canvas.width * 2;
-                let y = Math.sin(planet.angle) * planet.radius / canvas.height * 2;
+                let x = Math.cos(planet.angle) * planet.radius / 200 * aspectRatio;
+                let y = Math.sin(planet.angle) * planet.radius / 200;
                 drawCircle(x, y, planet.size / 200, planet.color);
             });
             drawCircle(0, 0, 0.05, [1, 1, 0]); // 恒星
