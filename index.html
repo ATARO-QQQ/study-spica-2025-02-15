@@ -3,90 +3,87 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebGL 天体公転シミュレーション</title>
+    <title>天体公転シミュレーション</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
-        body { margin: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center; }
+        body { margin: 0; overflow: hidden; }
         canvas { display: block; }
-        .controls { position: absolute; top: 10px; left: 10px; background: rgba(255, 255, 255, 0.8); padding: 10px; border-radius: 5px; }
+        #controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+        }
     </style>
 </head>
 <body>
-    <div class="controls">
-        <button onclick="toggleSpeed()">倍速切替</button>
-        <div>
-            <label>天体の数: <input type="number" id="planetCount" min="1" max="10" value="3"></label>
-            <button onclick="applySettings()">設定適用</button>
-        </div>
-        <div id="planetSettings"></div>
+    <div id="controls">
+        <label>速度調整: <input type="range" id="speed" min="0.1" max="5" step="0.1" value="1"></label>
     </div>
-    <canvas id="glCanvas"></canvas>
     <script>
-        const canvas = document.getElementById("glCanvas");
-        const gl = canvas.getContext("webgl");
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
 
-        let planets = [];
-        let speedMultiplier = 1;
-        let lastTime = 0;
+        // 恒星を作成
+        const starGeometry = new THREE.SphereGeometry(2, 32, 32);
+        const starMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+        const star = new THREE.Mesh(starGeometry, starMaterial);
+        scene.add(star);
 
-        function createPlanets(count) {
-            planets = [];
-            const settingsDiv = document.getElementById("planetSettings");
-            settingsDiv.innerHTML = "";
-            for (let i = 0; i < count; i++) {
-                planets.push({
-                    radius: 50 + i * 30,
-                    speed: 0.01 + i * 0.005,
-                    size: 10,
-                    color: [Math.random(), Math.random(), Math.random()]
-                });
-                settingsDiv.innerHTML += `
-                    <div>
-                        <label>半径: <input type="number" value="${planets[i].radius}" id="radius${i}"></label>
-                        <label>速度: <input type="number" value="${planets[i].speed}" id="speed${i}" step="0.001"></label>
-                        <label>サイズ: <input type="number" value="${planets[i].size}" id="size${i}"></label>
-                    </div>
-                `;
-            }
+        // 天体データ
+        const planets = [];
+        const numPlanets = 5;
+        for (let i = 0; i < numPlanets; i++) {
+            const radius = 0.5 + Math.random();
+            const orbitRadius = 5 + i * 3;
+            const speed = 0.01 + Math.random() * 0.02;
+            const color = new THREE.Color(Math.random(), Math.random(), Math.random());
+
+            const geometry = new THREE.SphereGeometry(radius, 16, 16);
+            const material = new THREE.MeshBasicMaterial({ color: color });
+            const planet = new THREE.Mesh(geometry, material);
+            scene.add(planet);
+
+            planets.push({ planet, orbitRadius, speed, angle: Math.random() * Math.PI * 2 });
         }
 
-        function applySettings() {
-            const count = parseInt(document.getElementById("planetCount").value);
-            createPlanets(count);
+        // カメラ設定
+        camera.position.set(0, 15, 0);
+        camera.lookAt(0, 0, 0);
+
+        // 速度調整
+        let globalSpeed = 1;
+        document.getElementById("speed").addEventListener("input", (event) => {
+            globalSpeed = parseFloat(event.target.value);
+        });
+
+        // 軌道描画
+        const orbitLines = [];
+        for (let i = 0; i < numPlanets; i++) {
+            const orbitRadius = planets[i].orbitRadius;
+            const curve = new THREE.EllipseCurve(0, 0, orbitRadius, orbitRadius, 0, 2 * Math.PI, false, 0);
+            const points = curve.getPoints(100);
+            const geometry = new THREE.BufferGeometry().setFromPoints(points.map(p => new THREE.Vector3(p.x, 0, p.y)));
+            const material = new THREE.LineBasicMaterial({ color: 0xffffff });
+            const orbitLine = new THREE.Line(geometry, material);
+            scene.add(orbitLine);
+            orbitLines.push(orbitLine);
         }
 
-        function toggleSpeed() {
-            speedMultiplier = speedMultiplier === 1 ? 2 : 1;
-        }
-
-        function updatePlanets(time) {
-            const deltaTime = (time - lastTime) / 1000 * speedMultiplier;
-            lastTime = time;
-            gl.clear(gl.COLOR_BUFFER_BIT);
-            planets.forEach((planet, index) => {
-                planet.angle = (planet.angle || 0) + deltaTime * planet.speed;
-                const x = Math.cos(planet.angle) * planet.radius;
-                const y = Math.sin(planet.angle) * planet.radius;
-                drawCircle(x, y, planet.size, planet.color);
+        function animate() {
+            requestAnimationFrame(animate);
+            planets.forEach(p => {
+                p.angle += p.speed * globalSpeed;
+                p.planet.position.set(p.orbitRadius * Math.cos(p.angle), 0, p.orbitRadius * Math.sin(p.angle));
             });
-            requestAnimationFrame(updatePlanets);
+            renderer.render(scene, camera);
         }
-
-        function drawCircle(x, y, size, color) {
-            gl.beginPath();
-            gl.arc(x, y, size, 0, 2 * Math.PI);
-            gl.fillStyle = `rgb(${color[0] * 255}, ${color[1] * 255}, ${color[2] * 255})`;
-            gl.fill();
-        }
-
-        function init() {
-            gl.clearColor(0, 0, 0, 1);
-            createPlanets(3);
-            requestAnimationFrame(updatePlanets);
-        }
-
-        init();
+        animate();
     </script>
 </body>
 </html>
