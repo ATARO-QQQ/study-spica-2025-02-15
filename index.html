@@ -16,11 +16,20 @@
             padding: 10px;
             border-radius: 5px;
         }
+        #controls label {
+            display: block;
+            margin-bottom: 5px;
+        }
     </style>
 </head>
 <body>
     <div id="controls">
         <label>速度調整: <input type="range" id="speed" min="0.1" max="5" step="0.1" value="1"></label>
+        <label>天体の数: <input type="number" id="planetCount" min="1" max="10" value="5"></label>
+        <div id="planetSettings">
+            <!-- 各天体の設定は動的に追加されます -->
+        </div>
+        <button id="updatePlanets">更新</button>
     </div>
     <script>
         const scene = new THREE.Scene();
@@ -35,22 +44,51 @@
         const star = new THREE.Mesh(starGeometry, starMaterial);
         scene.add(star);
 
-        // 天体データ
-        const planets = [];
-        const numPlanets = 5;
-        for (let i = 0; i < numPlanets; i++) {
-            const radius = 0.5 + Math.random();
-            const orbitRadius = 5 + i * 3;
-            const speed = 0.01 + Math.random() * 0.02;
-            const color = new THREE.Color(Math.random(), Math.random(), Math.random());
+        // 天体の設定を動的に更新
+        function updatePlanetControls() {
+            const planetSettingsDiv = document.getElementById('planetSettings');
+            planetSettingsDiv.innerHTML = ''; // 初期化
 
-            const geometry = new THREE.SphereGeometry(radius, 16, 16);
-            const material = new THREE.MeshBasicMaterial({ color: color });
-            const planet = new THREE.Mesh(geometry, material);
-            scene.add(planet);
-
-            planets.push({ planet, orbitRadius, speed, angle: Math.random() * Math.PI * 2 });
+            const planetCount = parseInt(document.getElementById('planetCount').value);
+            for (let i = 0; i < planetCount; i++) {
+                const planetDiv = document.createElement('div');
+                planetDiv.innerHTML = `
+                    <h4>天体 ${i + 1}</h4>
+                    <label>色: <input type="color" id="color${i}" value="#${Math.floor(Math.random()*16777215).toString(16)}"></label>
+                    <label>大きさ: <input type="number" id="size${i}" min="0.1" max="5" step="0.1" value="${(0.5 + Math.random()).toFixed(1)}"></label>
+                    <label>公転半径: <input type="number" id="radius${i}" min="3" max="20" step="1" value="${(5 + i * 3)}"></label>
+                    <label>速度: <input type="number" id="speed${i}" min="0.01" max="0.1" step="0.01" value="${(0.01 + Math.random() * 0.02).toFixed(2)}"></label>
+                `;
+                planetSettingsDiv.appendChild(planetDiv);
+            }
         }
+
+        // 初期化時の天体数を更新
+        updatePlanetControls();
+
+        // 天体の数変更時に設定を更新
+        document.getElementById('planetCount').addEventListener('input', updatePlanetControls);
+
+        // 天体設定を反映
+        const planets = [];
+        document.getElementById('updatePlanets').addEventListener('click', () => {
+            // 既存の天体をシーンから削除
+            planets.forEach(p => scene.remove(p.planet));
+
+            const planetCount = parseInt(document.getElementById('planetCount').value);
+            for (let i = 0; i < planetCount; i++) {
+                const color = new THREE.Color(document.getElementById(`color${i}`).value);
+                const size = parseFloat(document.getElementById(`size${i}`).value);
+                const orbitRadius = parseFloat(document.getElementById(`radius${i}`).value);
+                const speed = parseFloat(document.getElementById(`speed${i}`).value);
+                const geometry = new THREE.SphereGeometry(size, 16, 16);
+                const material = new THREE.MeshBasicMaterial({ color });
+                const planet = new THREE.Mesh(geometry, material);
+                scene.add(planet);
+
+                planets.push({ planet, orbitRadius, speed, angle: Math.random() * Math.PI * 2 });
+            }
+        });
 
         // カメラ設定
         camera.position.set(0, 15, 0);
@@ -64,15 +102,18 @@
 
         // 軌道描画
         const orbitLines = [];
-        for (let i = 0; i < numPlanets; i++) {
-            const orbitRadius = planets[i].orbitRadius;
-            const curve = new THREE.EllipseCurve(0, 0, orbitRadius, orbitRadius, 0, 2 * Math.PI, false, 0);
-            const points = curve.getPoints(100);
-            const geometry = new THREE.BufferGeometry().setFromPoints(points.map(p => new THREE.Vector3(p.x, 0, p.y)));
-            const material = new THREE.LineBasicMaterial({ color: 0xffffff });
-            const orbitLine = new THREE.Line(geometry, material);
-            scene.add(orbitLine);
-            orbitLines.push(orbitLine);
+        function updateOrbits() {
+            orbitLines.forEach(line => scene.remove(line)); // 既存の軌道線を削除
+            for (let i = 0; i < planets.length; i++) {
+                const orbitRadius = planets[i].orbitRadius;
+                const curve = new THREE.EllipseCurve(0, 0, orbitRadius, orbitRadius, 0, 2 * Math.PI, false, 0);
+                const points = curve.getPoints(100);
+                const geometry = new THREE.BufferGeometry().setFromPoints(points.map(p => new THREE.Vector3(p.x, 0, p.y)));
+                const material = new THREE.LineBasicMaterial({ color: 0xffffff });
+                const orbitLine = new THREE.Line(geometry, material);
+                scene.add(orbitLine);
+                orbitLines.push(orbitLine);
+            }
         }
 
         function animate() {
@@ -81,6 +122,7 @@
                 p.angle += p.speed * globalSpeed;
                 p.planet.position.set(p.orbitRadius * Math.cos(p.angle), 0, p.orbitRadius * Math.sin(p.angle));
             });
+            updateOrbits();
             renderer.render(scene, camera);
         }
         animate();
