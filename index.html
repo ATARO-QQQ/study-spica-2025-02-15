@@ -3,129 +3,90 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>天体公転シミュレーション</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gl-matrix/2.8.1/gl-matrix-min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.7/dat.gui.min.js"></script>
+    <title>WebGL 天体公転シミュレーション</title>
     <style>
-        body { margin: 0; overflow: hidden; }
+        body { margin: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center; }
         canvas { display: block; }
+        .controls { position: absolute; top: 10px; left: 10px; background: rgba(255, 255, 255, 0.8); padding: 10px; border-radius: 5px; }
     </style>
 </head>
 <body>
+    <div class="controls">
+        <button onclick="toggleSpeed()">倍速切替</button>
+        <div>
+            <label>天体の数: <input type="number" id="planetCount" min="1" max="10" value="3"></label>
+            <button onclick="applySettings()">設定適用</button>
+        </div>
+        <div id="planetSettings"></div>
+    </div>
     <canvas id="glCanvas"></canvas>
     <script>
         const canvas = document.getElementById("glCanvas");
         const gl = canvas.getContext("webgl");
-        if (!gl) {
-            alert("WebGLがサポートされていません");
-        }
-        
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
-        gl.viewport(0, 0, canvas.width, canvas.height);
-        
-        const vertexShaderSource = `
-            attribute vec2 a_position;
-            uniform vec2 u_resolution;
-            void main() {
-                vec2 zeroToOne = a_position / u_resolution;
-                vec2 zeroToTwo = zeroToOne * 2.0;
-                vec2 clipSpace = zeroToTwo - 1.0;
-                gl_Position = vec4(clipSpace * vec2(1, -1), 0, 1);
-                gl_PointSize = 5.0;
-            }
-        `;
-        
-        const fragmentShaderSource = `
-            precision mediump float;
-            uniform vec4 u_color;
-            void main() {
-                gl_FragColor = u_color;
-            }
-        `;
-        
-        function createShader(gl, type, source) {
-            const shader = gl.createShader(type);
-            gl.shaderSource(shader, source);
-            gl.compileShader(shader);
-            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-                console.error(gl.getShaderInfoLog(shader));
-                gl.deleteShader(shader);
-                return null;
-            }
-            return shader;
-        }
-        
-        const vertexShader = createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
-        const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
-        
-        const program = gl.createProgram();
-        gl.attachShader(program, vertexShader);
-        gl.attachShader(program, fragmentShader);
-        gl.linkProgram(program);
-        
-        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-            console.error(gl.getProgramInfoLog(program));
-            gl.deleteProgram(program);
-        }
-        
-        const positionAttributeLocation = gl.getAttribLocation(program, "a_position");
-        const resolutionUniformLocation = gl.getUniformLocation(program, "u_resolution");
-        const colorUniformLocation = gl.getUniformLocation(program, "u_color");
-        
-        const positionBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-        
-        gl.useProgram(program);
-        gl.enableVertexAttribArray(positionAttributeLocation);
-        
-        gl.vertexAttribPointer(positionAttributeLocation, 2, gl.FLOAT, false, 0, 0);
-        
-        gl.uniform2f(resolutionUniformLocation, canvas.width, canvas.height);
-        
-        const gui = new dat.GUI();
-        const settings = { numPlanets: 3 };
-        
+
         let planets = [];
-        function createPlanets(num) {
+        let speedMultiplier = 1;
+        let lastTime = 0;
+
+        function createPlanets(count) {
             planets = [];
-            for (let i = 0; i < num; i++) {
+            const settingsDiv = document.getElementById("planetSettings");
+            settingsDiv.innerHTML = "";
+            for (let i = 0; i < count; i++) {
                 planets.push({
-                    radius: Math.random() * 200 + 50,
-                    angle: Math.random() * Math.PI * 2,
-                    speed: Math.random() * 0.02 + 0.005,
-                    size: Math.random() * 8 + 2,
-                    color: [Math.random(), Math.random(), Math.random(), 1]
+                    radius: 50 + i * 30,
+                    speed: 0.01 + i * 0.005,
+                    size: 10,
+                    color: [Math.random(), Math.random(), Math.random()]
                 });
+                settingsDiv.innerHTML += `
+                    <div>
+                        <label>半径: <input type="number" value="${planets[i].radius}" id="radius${i}"></label>
+                        <label>速度: <input type="number" value="${planets[i].speed}" id="speed${i}" step="0.001"></label>
+                        <label>サイズ: <input type="number" value="${planets[i].size}" id="size${i}"></label>
+                    </div>
+                `;
             }
         }
-        createPlanets(settings.numPlanets);
-        gui.add(settings, "numPlanets", 1, 10, 1).onChange(createPlanets);
-        
-        function drawScene() {
-            gl.clear(gl.COLOR_BUFFER_BIT);
-            
-            const star = [canvas.width / 2, canvas.height / 2];
-            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(star), gl.STATIC_DRAW);
-            gl.uniform4f(colorUniformLocation, 1, 1, 0, 1);
-            gl.drawArrays(gl.POINTS, 0, 1);
-            
-            planets.forEach(planet => {
-                planet.angle += planet.speed;
-                const x = canvas.width / 2 + Math.cos(planet.angle) * planet.radius;
-                const y = canvas.height / 2 + Math.sin(planet.angle) * planet.radius;
-                
-                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([x, y]), gl.STATIC_DRAW);
-                gl.uniform4f(colorUniformLocation, ...planet.color);
-                gl.drawArrays(gl.POINTS, 0, 1);
-            });
-            
-            requestAnimationFrame(drawScene);
+
+        function applySettings() {
+            const count = parseInt(document.getElementById("planetCount").value);
+            createPlanets(count);
         }
-        
-        gl.clearColor(0, 0, 0, 1);
-        gl.clear(gl.COLOR_BUFFER_BIT);
-        drawScene();
+
+        function toggleSpeed() {
+            speedMultiplier = speedMultiplier === 1 ? 2 : 1;
+        }
+
+        function updatePlanets(time) {
+            const deltaTime = (time - lastTime) / 1000 * speedMultiplier;
+            lastTime = time;
+            gl.clear(gl.COLOR_BUFFER_BIT);
+            planets.forEach((planet, index) => {
+                planet.angle = (planet.angle || 0) + deltaTime * planet.speed;
+                const x = Math.cos(planet.angle) * planet.radius;
+                const y = Math.sin(planet.angle) * planet.radius;
+                drawCircle(x, y, planet.size, planet.color);
+            });
+            requestAnimationFrame(updatePlanets);
+        }
+
+        function drawCircle(x, y, size, color) {
+            gl.beginPath();
+            gl.arc(x, y, size, 0, 2 * Math.PI);
+            gl.fillStyle = `rgb(${color[0] * 255}, ${color[1] * 255}, ${color[2] * 255})`;
+            gl.fill();
+        }
+
+        function init() {
+            gl.clearColor(0, 0, 0, 1);
+            createPlanets(3);
+            requestAnimationFrame(updatePlanets);
+        }
+
+        init();
     </script>
 </body>
 </html>
