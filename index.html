@@ -8,21 +8,23 @@
     <style>
         body {
             margin: 0;
-            display: flex;
             height: 100%;
+            display: flex;
+            flex-direction: row;
             overflow: hidden;
         }
         canvas {
             display: block;
+            flex-grow: 1; /* 残りの領域を占める */
         }
         #controls {
+            width: 250px;
+            height: 100%;
             background: rgba(255, 255, 255, 0.8);
             padding: 10px;
             border-radius: 5px;
-            width: 300px; /* コントロールパネルの幅を固定 */
-            height: 100%;
-            overflow-y: auto; /* スクロール可能 */
-            flex-shrink: 0; /* 縮小しないように */
+            overflow-y: auto; /* スクロール可能にする */
+            position: relative;
         }
         #controls label {
             display: block;
@@ -44,9 +46,9 @@
     </div>
     <script>
         const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / (window.innerHeight), 0.1, 1000);
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer();
-        renderer.setSize(window.innerWidth - 300, window.innerHeight); // コントロールパネル分を差し引いた幅
+        renderer.setSize(window.innerWidth - 250, window.innerHeight); // コントロールパネルを除いた残りの領域でサイズ設定
         document.body.appendChild(renderer.domElement);
 
         // 恒星を作成
