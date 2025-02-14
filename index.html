@@ -6,8 +6,14 @@
     <title>天体公転シミュレーション</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
-        body { margin: 0; overflow: hidden; }
-        canvas { display: block; }
+        body {
+            margin: 0;
+            height: 100%;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+        }
         #controls {
             position: absolute;
             top: 10px;
@@ -15,10 +21,16 @@
             background: rgba(255, 255, 255, 0.8);
             padding: 10px;
             border-radius: 5px;
+            width: 250px;
+            height: 90%;
+            overflow-y: auto; /* スクロール可能にする */
         }
         #controls label {
             display: block;
             margin-bottom: 5px;
+        }
+        #planetSettings div {
+            margin-bottom: 10px;
         }
     </style>
 </head>
