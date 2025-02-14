@@ -49,8 +49,8 @@
         renderer.setSize(window.innerWidth - 300, window.innerHeight); // コントロールパネルの幅を引いたサイズ
         document.body.appendChild(renderer.domElement);
 
-        // 恒星を作成
-        const starGeometry = new THREE.SphereGeometry(2, 32, 32);
+        // 恒星を作成（サイズを小さく）
+        const starGeometry = new THREE.SphereGeometry(1, 32, 32); // 恒星の半径を1に変更
         const starMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
         const star = new THREE.Mesh(starGeometry, starMaterial);
         scene.add(star);
@@ -66,8 +66,8 @@
                 planetDiv.innerHTML = `
                     <h4>天体 ${i + 1}</h4>
                     <label>色: <input type="color" id="color${i}" value="#${Math.floor(Math.random()*16777215).toString(16)}"></label>
-                    <label>大きさ: <input type="number" id="size${i}" min="0.1" max="5" step="0.1" value="${(0.5 + Math.random()).toFixed(1)}"></label>
-                    <label>公転半径: <input type="number" id="radius${i}" min="3" max="20" step="1" value="${(5 + i * 3)}"></label>
+                    <label>大きさ: <input type="number" id="size${i}" min="0.1" max="1" step="0.1" value="${(0.1 + Math.random()).toFixed(1)}"></label> <!-- 大きさを小さく -->
+                    <label>公転半径: <input type="number" id="radius${i}" min="3" max="15" step="1" value="${(3 + i * 2)}"></label> <!-- 公転半径を小さく -->
                     <label>速度: <input type="number" id="speed${i}" min="0.01" max="0.1" step="0.01" value="${(0.01 + Math.random() * 0.02).toFixed(2)}"></label>
                 `;
                 planetSettingsDiv.appendChild(planetDiv);
